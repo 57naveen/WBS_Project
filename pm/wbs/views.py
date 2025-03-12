@@ -7,6 +7,10 @@ from .models import Project, Task, Employee, TaskAssignment
 from .serializers import ProjectSerializer, TaskSerializer, EmployeeSerializer, TaskAssignmentSerializer
 from .task_breakdown import get_project_information_and_breakdown
 from .tasks import assign_tasks_with_llm
+from .serializers import TaskSerializer
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from celery.result import AsyncResult
 
 # CRUD API Views
 class ProjectViewSet(viewsets.ModelViewSet):    
@@ -35,6 +39,8 @@ def task_breakdown_view(request):
             project_name = data.get('project_name', '').strip()
             project_description = data.get('project_description', '').strip()
             deadline = data.get('deadline', '').strip()
+
+            print("📥 Received Data:", data) 
 
             if not project_name or not project_description or not deadline:
                 return JsonResponse({"error": "Missing parameters"}, status=400)
@@ -77,7 +83,7 @@ def task_breakdown_view(request):
 
             if tasks_to_create:
                 Task.objects.bulk_create(tasks_to_create)  # Bulk insert
-                return JsonResponse({"message": "Tasks inserted successfully", "tasks_count": len(tasks_to_create)})
+                return JsonResponse({"message": "Project added successfully", "tasks_count": len(tasks_to_create)})
 
             return JsonResponse({"message": "No tasks to insert"}, status=400)
 
@@ -90,8 +96,69 @@ def task_breakdown_view(request):
 # Task Assignment API
 @csrf_exempt
 def trigger_task_assignment(request):
-    result = assign_tasks_with_llm.delay()  # Run Celery task asynchronously
-    return JsonResponse({"status": "Task started", "task_id": result.id})
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            selected_tasks = data.get("tasks", [])
+
+            print(f"📥 Received tasks: {selected_tasks}")  # Debugging
+
+            if not selected_tasks:
+                return JsonResponse({"message": "No tasks selected"}, status=400)
+
+            # ✅ Trigger Celery Task
+            task = assign_tasks_with_llm.delay(json.dumps({"tasks": selected_tasks}))
+
+            return JsonResponse({
+                "message": "Task processing started!",
+                "task_id": task.id  # ✅ Return Task ID for tracking
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+def get_task_result(request, task_id):
+    """Fetch task status and result from Celery"""
+    result = AsyncResult(task_id)
+
+    if not result:
+        return JsonResponse({"status": "error", "message": "Task not found"}, status=404)
+
+    if result.state == "PENDING":
+        return JsonResponse({"status": "pending", "message": "Task is still processing..."})
+
+    if result.state == "FAILURE":
+        return JsonResponse({"status": "error", "message": "Task execution failed."})
+
+    if result.state == "SUCCESS":
+        response_data = result.result  # This should be the JSON returned by the Celery task
+        return JsonResponse(response_data)
+
+    return JsonResponse({"status": result.state, "message": "Task is still processing..."})
+
+
+def assign_tasks(request):
+    # Your logic to update tasks
+    updated_task = {
+        "id": 1,
+        "title": "Define Project Scope and Objectives",
+        "status": "Assigned"
+    }
+
+    # 🚀 Notify WebSocket clients
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "tasks",
+        {
+            "type": "task.update",
+            "message": updated_task
+        }
+    )
+
+    return JsonResponse({"status": "success", "task": updated_task})
 
 
 def create_employee_view(request):
@@ -132,8 +199,7 @@ def create_task_view(request):
         
 
 
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+
 
 def notify_task_update(task):
     channel_layer = get_channel_layer()

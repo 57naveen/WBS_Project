@@ -53,7 +53,10 @@ INSTALLED_APPS = [
 ASGI_APPLICATION = "pm.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",  # Use Redis in production
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],  # Ensure this is the correct Redis
+        },
     },
 }
 
@@ -72,7 +75,13 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'pm.urls'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Update with your React URL
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",  # Update with your React URL
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 TEMPLATES = [

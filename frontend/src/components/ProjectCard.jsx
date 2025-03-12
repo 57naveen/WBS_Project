@@ -1,9 +1,9 @@
 import { FaUsers } from "react-icons/fa";
 
 const ProjectCard = ({ name, progress, team = [] }) => {
-  console.log("ProjectCard received team:", team); // Debugging
-  console.log("name received team:", name); // Debugging
-  console.log("progress received team:", progress); // Debugging
+  // console.log("ProjectCard received team:", team); // Debugging
+  // console.log("name received team:", name); // Debugging
+  // console.log("progress received team:", progress); // Debugging
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-md">

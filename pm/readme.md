@@ -4,6 +4,11 @@
 # Run Redis in Docker
   - docker run --name redis -d -p 6379:6379 redis
 
+
+# Websocket
+
+  - daphne -b 0.0.0.0 -p 8000 pm.asgi:application
+
 # Delete All Records from All Tables in the Database
 
   from django.apps import apps

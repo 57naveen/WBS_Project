@@ -5,14 +5,20 @@ import Tasks from "./components/pages/Task";
 import Employees from "./components/pages/Employee";
 // import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import Dashboard from "./components/pages/Dashboard";
 
 function App() {
   return (
     <Router>
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="flex">
-        <Sidebar />
+        {/* <div className="h-screen" > */}
+         <Sidebar />
+        {/* </div> */}
+        
         <div className="flex-1">
           {/* <Navbar /> */}
           <main className="p-6">
