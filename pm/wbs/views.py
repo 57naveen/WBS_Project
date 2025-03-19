@@ -6,7 +6,7 @@ import json
 from .models import Project, Task, Employee, TaskAssignment 
 from .serializers import ProjectSerializer, TaskSerializer, EmployeeSerializer, TaskAssignmentSerializer
 from .task_breakdown import get_project_information_and_breakdown
-from .tasks import assign_tasks_with_llm
+from .tasks import assign_tasks_with_gemini
 from .serializers import TaskSerializer
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -101,23 +101,22 @@ def trigger_task_assignment(request):
             data = json.loads(request.body)
             selected_tasks = data.get("tasks", [])
 
-            print(f"📥 Received tasks: {selected_tasks}")  # Debugging
-
             if not selected_tasks:
-                return JsonResponse({"message": "No tasks selected"}, status=400)
+                return JsonResponse({"status": "error", "message": "No tasks selected. Please select at least one task to assign."}, status=400)
 
             # ✅ Trigger Celery Task
-            task = assign_tasks_with_llm.delay(json.dumps({"tasks": selected_tasks}))
+            task = assign_tasks_with_gemini.delay(json.dumps({"tasks": selected_tasks}))
 
             return JsonResponse({
-                "message": "Task processing started!",
-                "task_id": task.id  # ✅ Return Task ID for tracking
+                "status": "pending",
+                "message": "Task assignment is in progress...",
+                "task_id": task.id  # ✅ Returning Task ID for frontend polling
             })
 
         except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON"}, status=400)
+            return JsonResponse({"status": "error", "message": "Invalid JSON format. Please check the request data."}, status=400)
 
-    return JsonResponse({"error": "Invalid request method"}, status=405)
+    return JsonResponse({"status": "error", "message": "Invalid request method. Use POST."}, status=405)
 
 
 def get_task_result(request, task_id):
@@ -125,20 +124,28 @@ def get_task_result(request, task_id):
     result = AsyncResult(task_id)
 
     if not result:
-        return JsonResponse({"status": "error", "message": "Task not found"}, status=404)
+        return JsonResponse({"status": "error", "message": "Task ID not found. Please check the task ID and try again."}, status=404)
 
     if result.state == "PENDING":
-        return JsonResponse({"status": "pending", "message": "Task is still processing..."})
+        return JsonResponse({"status": "pending", "message": "Task assignment is still in queue. Please wait..."})
+
+    if result.state == "STARTED":
+        return JsonResponse({"status": "processing", "message": "Task assignment is currently being processed. Please wait..."})
 
     if result.state == "FAILURE":
-        return JsonResponse({"status": "error", "message": "Task execution failed."})
+        return JsonResponse({"status": "error", "message": f"Task execution failed: {str(result.result)}"}, status=500)
 
     if result.state == "SUCCESS":
-        response_data = result.result  # This should be the JSON returned by the Celery task
-        return JsonResponse(response_data)
+        response_data = result.result  # JSON returned by Celery task
+        return JsonResponse({
+            "status": response_data.get("status"),
+            "message": response_data.get("message"),
+            "assigned_count": response_data.get("assigned_count"),
+            "assigned_tasks": response_data.get("assigned_tasks", []),
+            "skipped_reasons": response_data.get("skipped_reasons", [])  # ✅ Include skipped reasons
+        })
 
-    return JsonResponse({"status": result.state, "message": "Task is still processing..."})
-
+    return JsonResponse({"status": "processing", "message": "Task assignment is still in progress..."})
 
 def assign_tasks(request):
     # Your logic to update tasks

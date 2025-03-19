@@ -36,6 +36,16 @@ export const fetchTeamMembers = async () => {
   }
 };
 
+export const fetchTaskAssignment = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}/task-assignments/`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching taskAssignment:", error);
+    return [];
+  }
+};
+
 // export const fetchTeamMembers = async () => {
 //   try {
 //     const response = await fetch("http://localhost:8000/api/team-members/");

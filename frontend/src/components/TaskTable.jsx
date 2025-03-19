@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState,useMemo} from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const TaskTable = ({ data,project }) => {
+const TaskTable = ({ data,projects }) => {
   const [rowSelection, setRowSelection] = useState({});
 
   // Toggle selection state
@@ -37,7 +37,7 @@ const TaskTable = ({ data,project }) => {
         tasks: selectedRows,
       });
   
-      console.log("API Response:", response.data);
+      // console.log("API Response:", response.data);
   
       if (response.data.task_id) {  // ✅ Check if task_id exists
         toast.warn(response.data.message || "No tasks assigned.");
@@ -47,40 +47,85 @@ const TaskTable = ({ data,project }) => {
       }
     } catch (error) {
       toast.error("Task assignment failed!");
-      console.log("Error:", error.response ? error.response.data : error);
+      // console.log("Error:", error.response ? error.response.data : error);
     }
   };
 
+  let pendingToastShown = false; // Move outside of interval function
+
   const pollTaskResult = async (taskId) => {
-    let attempts = 0;
-    const maxAttempts = 10; // Wait max ~10s
+      let attempts = 0;
+      const maxAttempts = 10; // Max wait ~10s
+    
+      const interval = setInterval(async () => {
+        try {
+          const response = await axios.get(`http://localhost:8000/api/task-result/${taskId}/`);
+          // console.log("Task Result Response:", response.data);
+          
+          const { status, message, assigned_tasks, skipped_reasons,unassigned_tasks_Message } = response.data;
   
-    const interval = setInterval(async () => {
-      try {
-        const response = await axios.get(`http://localhost:8000/api/task-result/${taskId}/`);
-        console.log("Task Result Response:", response.data);
-        setRowSelection({});
-        if (response.data.status === "success") {
+          if (status === "success") {
+            clearInterval(interval);
+            setRowSelection({});
+    
+            // ✅ Show assigned tasks
+            assigned_tasks.forEach((task) => {
+              toast.success(`Task "${task.task_id}" assigned to ${task.employee_id}`);
+            });
+    
+            // ✅ If skipped reasons exist, show them too
+            if (skipped_reasons.length > 0) {
+              toast.warn(`Some tasks were skipped:\n${skipped_reasons.join("\n")}`);
+            }
+          } 
+          else if (response.data.status === "warning") {
+            clearInterval(interval);
+            toast.warn(response.data.message); // "No tasks assigned."
+            setRowSelection({});
+    
+            // ✅ Show skipped reasons in separate toasts
+            response.data.skipped_reasons.forEach((reason) => {
+              setTimeout(() => {
+                toast.warn(reason);
+              }, 3000);
+              
+            });
+
+          
+          }
+          else if (response.data.status === "pending") {
+            if (!pendingToastShown) {
+              toast.warn(response.data.message);
+              pendingToastShown = true;
+              setRowSelection({});
+              // Reset flag after 5 seconds
+              setTimeout(() => {
+                pendingToastShown = false;
+              }, 5000);
+            }
+          }
+          else if (response.data.status === "processing") {
+            toast.info(response.data.message);
+          } 
+          else if (response.data.status === "error") {
+            clearInterval(interval);
+            toast.error(response.data.message);
+            setRowSelection({});
+          } 
+  
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            toast.warn("Task is taking too long to process.");
+          }
+        } catch (error) {
           clearInterval(interval);
-          response.data.assigned_tasks.forEach((task) => toast.success(task));
-        }else if (response.data.status === "Pending"){
-          toast.warn(response.data.message || "Pending");
+          toast.error("Error fetching task result.");
+          console.error("Error fetching task result:", error);
         }
-         else if (response.data.status === "error") { // ✅ Handle errors properly
-          clearInterval(interval);
-          toast.error(response.data.message);  // Show error message
-        } else if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          toast.warn("Task is taking too long.");
-        }
-      } catch (error) {
-        clearInterval(interval);
-        toast.error("Error fetching task result.");
-        console.error("Error fetching task result:", error);
-      }
-      attempts++;
-    }, 2000); // Poll every 2 seconds
+        attempts++;
+      }, 2000); // Poll every 2 seconds
   };
+  
 
 
 
@@ -103,7 +148,14 @@ const TaskTable = ({ data,project }) => {
           <tbody>
         {data.map((task, index) => {
           // Find the matching project for the current task
-          const taskProject = project.find((p) => p.id === task.project) || {};
+          const taskProject = projects.find(proj => proj.id === task.project_id) || null;
+
+          
+            if (!taskProject) {
+              console.warn(`⚠️ No project found for task ${task.id} (project_id: ${task.project_id})`);
+            }
+
+          // console.log("taskProject :", taskProject)
 
           return (
             <tr key={index} className="hover:bg-gray-800">
@@ -116,7 +168,7 @@ const TaskTable = ({ data,project }) => {
                 />
               </td>
               <td className="px-4 py-2">{task.id}</td>
-              <td className="px-4 py-2">{taskProject.name || "No Project"}</td>
+              <td className="px-4 py-2">{taskProject ? taskProject.name : "Loading..."}</td>
               <td className="px-4 py-2">{task.title}</td>
               <td className="px-4 py-2">{task.description}</td>
               <td className="px-4 py-2">{task.deadline}</td>

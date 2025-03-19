@@ -15,12 +15,18 @@ from asgiref.sync import async_to_sync
 from datetime import date
 from decimal import Decimal
 from django.core.exceptions import ObjectDoesNotExist
+import google.generativeai as genai
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# 🔹 Load API key from environment variable for better security
-GROQ_API_KEY = "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" 
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+# # 🔹 Load API key from environment variable for better security
+# GROQ_API_KEY = "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" 
+# GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+# 🔹 Configure the Gemini AI client
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class DateTimeEncoder(json.JSONEncoder):
     """Custom JSON encoder to handle date and Decimal serialization"""
@@ -56,21 +62,22 @@ class CustomJSONEncoder(json.JSONEncoder):
         return super().default(obj)
         
 @shared_task
-def assign_tasks_with_llm(selected_tasks_json):
-    """Assigns unassigned tasks to eligible employees using an LLM model"""
-
+def assign_tasks_with_gemini(selected_tasks_json):
+    """Assigns unassigned tasks to eligible employees using Gemini AI"""
     assigned_task_messages = []  # ✅ Store assigned task messages
+    skipped_reasons = []  # ✅ Store skipped task reasons
+    unassigned_tasks_Message = []
 
-    logger.info("📤 Received tasks JSON: %s", selected_tasks_json)
+    logger.info("\U0001F4E4 Received tasks JSON: %s", selected_tasks_json)
 
     # 🔹 Step 1: Parse Input JSON
     try:
         parsed_data = json.loads(selected_tasks_json)
         selected_tasks = parsed_data.get("tasks", [])
-        logger.info("✅ Parsed %d tasks", len(selected_tasks))
+        logger.info(" Parsed %d tasks", len(selected_tasks))
     except (json.JSONDecodeError, ValueError) as e:
-        logger.error("❌ JSON Decode Error: %s", e)
-        return {"status": "error", "message": "Invalid JSON format.", "assigned_tasks": []}
+        logger.error(" JSON Decode Error: %s", e)
+        return {"status": "error", "message": "Invalid JSON format.", "assigned_tasks": [], "skipped_reasons": []}
 
     # 🔹 Step 2: Filter Unassigned Tasks
     unassigned_tasks = [
@@ -78,8 +85,9 @@ def assign_tasks_with_llm(selected_tasks_json):
     ]
 
     if not unassigned_tasks:
-        logger.warning("⚠️ No unassigned tasks to process.")
-        return {"status": "warning", "message": "No unassigned tasks to process.", "assigned_tasks": []}
+        logger.warning("No unassigned tasks to process.")
+        unassigned_tasks_Message.append("No unassigned tasks to process.")
+        return {"status": "warning", "message": "No unassigned tasks to process.", "assigned_tasks": [], "skipped_reasons": []}
 
     # 🔹 Step 3: Get Available Employees
     employees = list(
@@ -89,52 +97,31 @@ def assign_tasks_with_llm(selected_tasks_json):
     )
 
     if not employees:
-        logger.warning("⚠️ No eligible employees available.")
-        return {"status": "warning", "message": "No eligible employees available.", "assigned_tasks": []}
+        logger.warning("No eligible employees available.")
+        return {"status": "warning", "message": "No eligible employees available.", "assigned_tasks": [], "skipped_reasons": []}
 
-    # 🔹 Step 4: Prepare LLM Request
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an AI that assigns tasks to employees based on skills, availability, workload, "
-                "maximum tasks per day, and performance rating.\n\n"
-                "Strictly return a valid JSON array. Use only double quotes for keys and values.\n"
-                "Ensure the response contains no extra text, no Markdown, no explanations, and no escape sequences.\n\n"
-                "Format:\n"
-                "[{\"task_id\": 1, \"employee_id\": 2}, {\"task_id\": 2, \"employee_id\": 3}]\n\n"
-                "DO NOT include any additional text—ONLY return a valid JSON array."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps({"tasks": unassigned_tasks, "employees": employees}, cls=CustomJSONEncoder),
-        },
-    ]
+    # 🔹 Step 4: Prepare LLM Request with Correct Format
+    prompt = (
+        "You are an AI that assigns tasks to employees based on skills, availability, workload, "
+        "maximum tasks per day, and performance rating.\n\n"
+        "### INSTRUCTIONS ###\n"
+        "1️⃣ STRICTLY return a JSON array.\n"
+        "2️⃣ NO extra text, NO Markdown, NO explanations.\n"
+        "3️⃣ Response format:\n"
+        "[{\"task_id\": 1, \"employee_id\": 2}, {\"task_id\": 2, \"employee_id\": 3}]\n"
+        "4️⃣ Do not use escape sequences or additional text.\n"
+    )
 
-    payload = {"model": "mixtral-8x7b-32768", "messages": messages, "temperature": 0.3}
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    user_input = json.dumps({"tasks": unassigned_tasks, "employees": employees}, cls=CustomJSONEncoder)
 
-    # 🔹 Step 5: Send Request to LLM
     try:
-        response = requests.post(GROQ_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("❌ LLM request failed: %s", e)
-        return {"status": "error", "message": "LLM request failed.", "assigned_tasks": []}
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt + "\n\n" + user_input)
 
-    llm_response = response.json()
-    assigned_tasks = llm_response.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        assigned_tasks = response.text.strip()
 
-    if not assigned_tasks:
-        logger.warning("⚠️ No tasks assigned by LLM.")
-        return {"status": "warning", "message": "No tasks assigned by LLM.", "assigned_tasks": []}
-
-    # 🔹 Step 6: Extract JSON Response from LLM
-    try:
-        assigned_tasks = assigned_tasks.encode("utf-8").decode("unicode_escape")  # Fix escape issues
+        # Ensure the response is properly formatted JSON
         match = re.search(r"\[.*\]", assigned_tasks, re.DOTALL)
-
         if not match:
             raise ValueError("Invalid response format. JSON not found.")
 
@@ -143,11 +130,12 @@ def assign_tasks_with_llm(selected_tasks_json):
 
         if not isinstance(assignments, list):
             raise ValueError("Invalid format. Expected a list of assignments.")
-    except (json.JSONDecodeError, ValueError) as e:
-        logger.error("❌ LLM response is not valid JSON: %s", e)
-        return {"status": "error", "message": "Invalid LLM response format.", "assigned_tasks": []}
 
-    # 🔹 Step 7: Assign Tasks
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error("Gemini response is not valid JSON: %s", e)
+        return {"status": "error", "message": "Invalid Gemini response format.", "assigned_tasks": [], "skipped_reasons": []}
+
+    # 🔹 Step 5: Assign Tasks
     assigned_count = 0
 
     for assignment in assignments:
@@ -155,7 +143,7 @@ def assign_tasks_with_llm(selected_tasks_json):
         employee_id = assignment.get("employee_id")
 
         if not task_id or not employee_id:
-            logger.warning("⚠️ Skipping invalid assignment: %s", assignment)
+            logger.warning("Skipping invalid assignment: %s", assignment)
             continue
 
         try:
@@ -163,7 +151,9 @@ def assign_tasks_with_llm(selected_tasks_json):
             employee = Employee.objects.get(id=employee_id)
 
             if employee.task_set.count() >= employee.max_tasks_per_day:
-                logger.info("🚫 Skipping task %d, %s has reached max tasks per day.", task_id, employee.name)
+                reason = f"Skipping task {task_id}, {employee.name} has reached max tasks per day."
+                logger.info("🚫 " + reason)
+                skipped_reasons.append(reason)  # ✅ Store skipped reason
                 continue
 
             # ✅ Assign task
@@ -178,8 +168,8 @@ def assign_tasks_with_llm(selected_tasks_json):
             TaskAssignment.objects.create(task=task, employee=employee, status="Assigned")
 
             assigned_count += 1
-            assignment_msg = f" Assigned '{task.title} ' to {employee.name}"
-            assigned_task_messages.append(assignment_msg)
+            assignment_msg = f" Assigned '{task.title}' to {employee.name}"
+            assigned_task_messages.append({"task_id": task.title, "employee_id": employee.name})
             logger.info(assignment_msg)
 
             # ✅ Notify employee
@@ -187,14 +177,14 @@ def assign_tasks_with_llm(selected_tasks_json):
             notify_task_update()
 
         except ObjectDoesNotExist:
-            logger.error("❌ Task or Employee does not exist (Task ID: %s, Employee ID: %s)", task_id, employee_id)
+            logger.error("Task or Employee does not exist (Task ID: %s, Employee ID: %s)", task_id, employee_id)
 
-        # 🔹 Step 8: Return Final Response to Frontend
+    # 🔹 Step 6: Return Final Response to Frontend
     status = "success" if assigned_count > 0 else "warning"
     message = (
-        f"✅ Assigned {assigned_count} tasks using LLM."
+        f"✅ Assigned {assigned_count} tasks using Gemini."
         if assigned_count > 0
-        else "⚠️ No tasks assigned."
+        else "No tasks assigned."
     )
 
     response_data = {
@@ -202,14 +192,18 @@ def assign_tasks_with_llm(selected_tasks_json):
         "message": message,
         "assigned_count": assigned_count,
         "assigned_tasks": assigned_task_messages,
+        "skipped_reasons": skipped_reasons,  # ✅ Include skipped reasons
+        "unassigned_tasks_Message":unassigned_tasks_Message
     }
 
-    logger.info("📤 Sending response to frontend: %s", response_data)
+    logger.info("\U0001F4E4 Sending response to frontend: %s", response_data)
 
     # 🔹 Send WebSocket Update (Optional)
     send_ws_update(response_data)
 
     return response_data  # ✅ Ensure frontend gets this response
+
+
 
 
 def send_ws_update(data):

@@ -26,7 +26,7 @@ const AddProjectPopUp = ({onClose, onSubmit }) => {
       deadline: formattedDate, // ✅ Format date correctly
     };
 
-    console.log("📤 Sending data:", projectData);
+    // console.log("📤 Sending data:", projectData);
 
     try {
       const response = await fetch("http://127.0.0.1:8000/api/task-breakdown/", {
@@ -45,7 +45,7 @@ const AddProjectPopUp = ({onClose, onSubmit }) => {
       }
   
       const result = await response.json();
-      console.log("✅ Project added successfully:", result);
+      // console.log("✅ Project added successfully:", result);
       toast.success(result.message || "Project added successfully!");
       setTimeout(() => {
         toast.success(result.tasks_count+" New Task Added");

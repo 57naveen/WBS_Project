@@ -15,15 +15,15 @@ const useWebSocket = (url) => {
         socketRef.current = ws;
 
         ws.onopen = () => {
-            console.log("✅ WebSocket Connected to", url);
+            // console.log("✅ WebSocket Connected to", url);
             setIsConnected(true);
         };
 
         ws.onmessage = (event) => {
-            console.log("📩 WebSocket Message Received:", event.data);
+            // console.log("📩 WebSocket Message Received:", event.data);
             try {
                 const parsedData = JSON.parse(event.data);
-                console.log("✅ Updating state with:", parsedData);
+                // console.log("✅ Updating state with:", parsedData);
                 setData(parsedData); // Ensure this updates the state
             } catch (error) {
                 console.error("⚠️ Error parsing WebSocket message:", error);
@@ -40,7 +40,7 @@ const useWebSocket = (url) => {
 
             // Auto-reconnect if the disconnect was NOT intentional (Code 1000 means clean exit)
             if (event.code !== 1000) {
-                console.log(`🔄 Attempting to reconnect in ${reconnectInterval / 1000} seconds...`);
+                // console.log(`🔄 Attempting to reconnect in ${reconnectInterval / 1000} seconds...`);
                 setTimeout(connectWebSocket, reconnectInterval);
             }
         };
