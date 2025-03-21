@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion"; // For smooth animations
+import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { removeUser } from "@/utils/userSlice";
 
 const Employees = () => {
   const [employeeData, setEmployeeData] = useState(null);
@@ -13,7 +15,10 @@ const Employees = () => {
   const [selectedProject, setSelectedProject] = useState(null); // Track selected project
   const user = useSelector((state) => state.user);
   const[data, setData] = useState({});
-  const [activeTab, setActiveTab] = useState("Assigned"); // Default tab
+  const [activeTab, setActiveTab] = useState("Assigned"); 
+  const dispatch = useDispatch(); // ✅ Redux hook
+  // const navigate = useNavigate(); // ✅ React Router hook for navigation
+  const userLogged = useSelector((state) => state.user); // Get logged-in user
 
   const categorizedTasks = {
     Assigned: employeeData?.tasks.filter((task) => task.project?.id === selectedProject && task.status === "Assigned"),
@@ -73,6 +78,9 @@ const Employees = () => {
       const token = localStorage.getItem("firebase_token");
       if (!token) {
         console.error("❌ No Firebase token found!");
+        alert("Session expired. Please log in again.");
+        dispatch(removeUser()); // ✅ Remove user from Redux store
+        // navigate("/login"); // ✅ Redirect to login page
         return;
       }
 
@@ -84,6 +92,15 @@ const Employees = () => {
         },
         body: JSON.stringify({ progress: updatedProgress, comment: updatedComment }),
       });
+
+      if (response.status === 401 || response.status === 403) {
+        console.error("❌ Unauthorized or token expired. Redirecting to login...");
+        alert("Session expired. Please log in again.");
+        localStorage.removeItem("firebase_token"); // ✅ Clear expired token
+        // navigate("/login"); // ✅ Redirect to login page
+        dispatch(removeUser());
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP Error! Status: ${response.status}`);
@@ -114,7 +131,7 @@ const Employees = () => {
     } catch (err) {
       console.error("❌ Error updating task:", err);
     }
-};
+  };
 
   if (!employeeData)
     return <p className="text-center text-lg font-semibold text-white">Loading employee details...</p>;

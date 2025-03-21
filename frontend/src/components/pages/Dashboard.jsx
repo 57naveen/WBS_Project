@@ -39,6 +39,7 @@ const Dashboard = ({showAdminPanel}) => {
   const [addProjectPopup, setAddProjectPopup] = useState(false);
   const [taskAssignment, setTaskAssignement] = useState([]);
   const { user, role, loading } = useAuth();
+  
   const userLogged = useSelector((state) => state.user);
 
   console.log("user:",user);
