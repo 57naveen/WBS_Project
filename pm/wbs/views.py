@@ -11,6 +11,13 @@ from .serializers import TaskSerializer
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from celery.result import AsyncResult
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET
+from rest_framework.decorators import api_view
+from rest_framework.parsers import JSONParser
+import firebase_admin
+from firebase_admin import auth
 
 # CRUD API Views
 class ProjectViewSet(viewsets.ModelViewSet):    
@@ -214,3 +221,157 @@ def notify_task_update(task):
         "task_updates", {"type": "send_task_update", "message": {"task_id": task.id, "status": task.status}}
     )
 
+def verify_firebase_token(request):
+    """Extract and verify Firebase ID token from Authorization header."""
+    print("🔥 verify_firebase_token called!")  # Debugging
+
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        print("❌ Missing or malformed Authorization header")
+        return None
+
+    token = auth_header.split("Bearer ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        print(f"✅ Firebase token verified for user: {decoded_token.get('email')}")
+        return decoded_token  # Contains user info (uid, email, etc.)
+    
+    except firebase_admin.auth.ExpiredIdTokenError:
+        print("❌ Token expired")
+    except firebase_admin.auth.RevokedIdTokenError:
+        print("❌ Token revoked")
+    except firebase_admin.auth.InvalidIdTokenError:
+        print("❌ Invalid Token")
+    except Exception as e:
+        print(f"❌ General error: {str(e)}")
+
+    return None
+
+@api_view(["GET"])
+def get_employee_data(request):
+    """Fetch employee details using Firebase authentication."""
+    print("🔥 get_employee_data called!")  # Debugging
+
+    decoded_user = verify_firebase_token(request)
+    if not decoded_user:
+        return JsonResponse({"error": "Unauthorized. Invalid token."}, status=401)
+
+    user_email = decoded_user.get("email")
+    print(f"✅ Request received from: {user_email}")
+
+    try:
+        employee = Employee.objects.get(email=user_email)
+
+        # Fetch assigned tasks
+        tasks = Task.objects.filter(assigned_to=employee).select_related("project")
+
+        # Fetch projects
+        projects = Project.objects.filter(task__assigned_to=employee).distinct()
+
+        data = {
+            "id": employee.id,
+            "name": employee.name,
+            "email": employee.email,
+            "role": employee.role,
+            "availability": employee.availability,
+            "on_leave": employee.on_leave,
+            "workload": employee.workload,
+            "max_tasks_per_day": employee.max_tasks_per_day,
+            "performance_rating": str(employee.performance_rating),
+            "skills": employee.skills.split(",") if employee.skills else [],
+            "tasks": [
+                {
+                    "id": task.id,
+                    "title": task.title,
+                    "status": task.status,
+                    "priority": task.priority,
+                    "deadline": task.deadline.strftime("%Y-%m-%d"),
+                    "project": {
+                        "id": task.project.id if task.project else None,
+                        "name": task.project.name if task.project else "No Project",
+                    },
+                }
+                for task in tasks
+            ],
+            "projects": [
+                {
+                    "id": project.id,
+                    "name": project.name,
+                    "deadline": project.deadline.strftime("%Y-%m-%d"),
+                }
+                for project in projects
+            ],
+        }
+
+        return JsonResponse(data, safe=False)
+
+    except Employee.DoesNotExist:
+        return JsonResponse({"error": "Employee not found"}, status=404)
+
+    except Exception as e:
+        print(f"❌ Error fetching employee data: {str(e)}")
+        return JsonResponse({"error": "An error occurred while retrieving data."}, status=500)
+    
+
+
+@api_view(["PATCH"])
+@csrf_exempt  
+def update_task(request, task_id):
+    """Update task progress, status, and comments (Firebase Auth)."""
+
+    # ✅ Verify Firebase Token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return JsonResponse({"error": "Unauthorized. Missing token."}, status=401)
+
+    token = auth_header.split("Bearer ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        user_email = decoded_token.get("email")  # Extract user email
+    except Exception as e:
+        return JsonResponse({"error": "Invalid or expired token."}, status=403)
+
+    # ✅ Get Task
+    task = get_object_or_404(Task, id=task_id)
+
+    # ✅ Check if the task belongs to the user
+    if task.assigned_to and task.assigned_to.email != user_email:
+        return JsonResponse({"error": "You are not authorized to update this task."}, status=403)
+
+    # ✅ Parse request body
+    try:
+        data = JSONParser().parse(request)
+    except Exception as e:
+        return JsonResponse({"error": "Invalid JSON format."}, status=400)
+
+    progress = data.get("progress")
+    comment = data.get("comment", "").strip()
+
+    # ✅ Validate progress value
+    if progress is not None:
+        if not (0 <= progress <= 100):
+            return JsonResponse({"error": "Progress must be between 0 and 100."}, status=400)
+        task.progress = progress
+
+    if progress != 100 and progress > 1:
+        task.status = "Pending" 
+
+    # ✅ Auto-update status to "Completed" when progress is 100%
+    if progress == 100:
+        task.status = "Completed"
+
+    # ✅ Update comments if provided
+    if comment:
+        task.comment = comment  # Ensure you have a `comment` field in Task model
+
+    task.save()
+
+    return JsonResponse({
+        "message": "Task updated successfully!",
+        "task": {
+            "id": task.id,
+            "progress": task.progress,
+            "status": task.status,
+            "comment": task.comment,
+        }
+    }, status=200)

@@ -13,10 +13,20 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from celery.schedules import crontab
+from datetime import timedelta
+import firebase_admin
+from firebase_admin import credentials
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+firebase_config_path = os.path.join(BASE_DIR, "firebase_admin.json")
+if not os.path.exists(firebase_config_path):
+    raise FileNotFoundError(f"Firebase config file not found at: {firebase_config_path}")
+
+cred = credentials.Certificate(os.path.join(BASE_DIR, "firebase_admin.json"))
+firebase_admin.initialize_app(cred)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -24,7 +34,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-z)w*inz9^41(ler1_707uvos-bpq+iwt*%sh*d(^$_*u!yl&*0'
 
-GEMINI_API_KEY = "AIzaSyBtiNbS7HmWYdwFBeJcWhM19YpEY89erFs"
+GEMINI_API_KEY = ""
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -64,6 +74,7 @@ CHANNEL_LAYERS = {
 
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -71,10 +82,54 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+   
 ]
 
-ROOT_URLCONF = 'pm.urls'
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+        
+    ],
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),  # Short-lived token for security
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # Refresh token valid for 7 days
+    "ROTATE_REFRESH_TOKENS": True,  # Rotate refresh tokens on every use
+}
+
+# ✅ Allow session cookies in development
+CORS_ALLOW_CREDENTIALS = True  # ✅ This is required to send cookies
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_HTTPONLY = False
+CORS_ALLOW_ALL_ORIGINS = True 
+ROOT_URLCONF = "pm.urls" 
+
+CORS_ALLOW_HEADERS = [
+    "authorization",
+    "content-type",
+    "accept",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
+CORS_ALLOW_METHODS = ["*"]
+
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PATCH",  # ✅ Allow PATCH method
+    "PUT",
+    "DELETE",
+    "OPTIONS",
+]
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+)
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
@@ -84,6 +139,7 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5173",
 ]
 
 TEMPLATES = [

@@ -66,9 +66,14 @@ class Task(models.Model):
     required_skills = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
+    progress = models.IntegerField(default=0)  # ✅ Add Progress Field
+    comment = models.TextField(blank=True, null=True)  # ✅ Add Comment Field
 
     def save(self, *args, **kwargs):
         """Ensure task deadline is within project deadline."""
+        if self.progress == 100:  
+            self.status = "Completed"  # ✅ Auto-update status when 100%
+            
         if self.project and self.deadline > self.project.deadline:
             raise ValueError("Task deadline cannot be later than the project's deadline.")
         super().save(*args, **kwargs)

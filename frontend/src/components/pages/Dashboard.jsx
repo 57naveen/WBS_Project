@@ -29,6 +29,7 @@ import { useSelector } from "react-redux";
 import { useAuth } from "../../utils/AuthContext";
 import Login from "../Login";
 import AdminPanel from "../AdminPanel";
+import Employees from "../Employees";
 
 const Dashboard = ({showAdminPanel}) => {
   const [projects, setProjects] = useState([]);
@@ -233,6 +234,11 @@ const Dashboard = ({showAdminPanel}) => {
         </div>
       )
      }
+
+
+     { user && role === "employee" && (
+     <Employees />
+     )}
  
   
 

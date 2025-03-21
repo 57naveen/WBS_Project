@@ -1,3 +1,5 @@
 pip install channels channels-redis
 
 pip install daphne
+
+pip install firebase-admin

@@ -53,6 +53,10 @@ const Login = () => {
         });
         console.log("Firestore document created for user:", user.uid);
 
+        // Get the Firebase auth token
+      const token = await user.getIdToken();
+      localStorage.setItem("firebase_token", token); // Store token for API requests
+
         // Delay profile update slightly
         setTimeout(async () => {
           await updateProfile(user, {
@@ -83,17 +87,20 @@ const Login = () => {
         setErrorMessage(error.message);
       }
     } else {
-      // Sign-in Logic
-      signInWithEmailAndPassword(auth, email.current.value, password.current.value)
-        .then((userCredential) => {
-          const user = userCredential.user;
-          console.log("User signed in:", user);
-          navigate("/dashboard");
-        })
-        .catch((error) => {
-          console.error("Sign-in failed:", error.message);
-          setErrorMessage(error.message);
-        });
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email.current.value, password.current.value);
+        const user = userCredential.user;
+        console.log("User signed in:", user);
+  
+        // Get the Firebase auth token
+        const token = await user.getIdToken();
+        localStorage.setItem("firebase_token", token); // Store token for API requests
+  
+        navigate("/dashboard");
+      } catch (error) {
+        console.error("Sign-in failed:", error.message);
+        setErrorMessage(error.message);
+      };
     }
   };
 
