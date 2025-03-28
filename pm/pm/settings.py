@@ -16,6 +16,12 @@ from celery.schedules import crontab
 from datetime import timedelta
 import firebase_admin
 from firebase_admin import credentials
+from dotenv import load_dotenv
+from urllib.parse import urlparse
+
+# load_dotenv() 
+# db_url = os.getenv("DATABASE_URL")
+# parsed_url = urlparse(db_url)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -105,7 +111,7 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_HTTPONLY = False
-CORS_ALLOW_ALL_ORIGINS = True 
+# CORS_ALLOW_ALL_ORIGINS = True 
 ROOT_URLCONF = "pm.urls" 
 
 CORS_ALLOW_HEADERS = [
@@ -161,19 +167,18 @@ TEMPLATES = [
 WSGI_APPLICATION = 'pm.wsgi.application'
 
 
+
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'mssql',
-        'NAME': 'wbs5',  # Your database name
-        'HOST': 'NAVEEN-DESKTOP\\SQLEXPRESS',  # Your MSSQL instance
-        'PORT': '1433',  # Default MSSQL port
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-            'trusted_connection': 'yes',  # Enables Windows Authentication
-        },
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres.lobqitavlqfbisaebtme',
+        'PASSWORD': 'N@veen@57',  
+        'HOST': 'aws-0-us-east-1.pooler.supabase.com',
+        'PORT': '6543',
     }
 }
 

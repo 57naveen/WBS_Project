@@ -6,15 +6,11 @@ import { signOut } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { addUser, removeUser } from "../utils/userSlice";
 import { useNavigate } from "react-router-dom";
-import userLogo from "../images/user.png"
-
-
+import userLogo from "../images/user.png";
 
 const Header = () => {
-
-
   const dispatch = useDispatch();
-  const user = useSelector((store)=>store.user)
+  const user = useSelector((store) => store.user);
   const [greeting, setGreeting] = useState("Good morning");
   const [currentDate, setCurrentDate] = useState("");
   const navigate = useNavigate();
@@ -40,24 +36,19 @@ const Header = () => {
     }
   }, []);
 
-
   const handelSignOut = () => {
-    
     signOut(auth)
-      .then(() => {
-      })
+      .then(() => {})
       .catch((error) => {
         navigate("/error");
       });
   };
 
-
-  
   // Using the useEffect to call this APi at initial render
   useEffect(() => {
     //This function  return the user object
-  const unsubscribe =  onAuthStateChanged(auth, (user) => {
-      if (user) {     
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
         //sign In
 
         // getting this object from firebase
@@ -79,14 +70,16 @@ const Header = () => {
     return () => unsubscribe();
   }, []);
 
-
   return (
     <div className="flex justify-between items-center bg-gradient-to-r from-blue-500 to-purple-500 p-4 shadow-lg rounded-b-2xl">
       {/* Greeting & Date */}
       <div>
-      <h1 className="text-xl font-bold text-white">{greeting}, <span className="uppercase text-amber-300">{user?.displayName} </span></h1>
-      <p className="text-gray-200">{currentDate}</p>
-    </div>
+        <h1 className="text-xl font-bold text-white">
+          {greeting},{" "}
+          <span className="uppercase text-amber-300">{user?.displayName} </span>
+        </h1>
+        <p className="text-gray-200">{currentDate}</p>
+      </div>
 
       {/* Search Bar */}
       <div className="flex items-center ml-40 bg-white px-4 py-2 rounded-full shadow-sm">
@@ -97,15 +90,26 @@ const Header = () => {
           className="bg-transparent outline-none pl-2 text-gray-700"
         />
       </div>
-        <div className=" ml-auto" >
-      { user?
-       <div className="flex ">
-        <img className="w-10 h-10" alt="usericon" src={userLogo}/>
-      <button onClick={handelSignOut} className="p-2 mx-5 font-medium outline:none bg-amber-300 rounded-4xl cursor-pointer hover:bg-amber-400" >SignOut</button>
-       </div> :   <div>
-      <button className="p-2 mx-5 bg-amber-300 rounded-4xl cursor-pointer" >SignIn</button>
-       </div>
-      }
+      <div className="ml-auto flex items-center gap-4 mx-2">
+        {user ? (
+          <div className="flex items-center gap-4">
+            <img
+              className="w-10 h-10 rounded-full border-2 border-white shadow-lg"
+              alt="User Icon"
+              src={userLogo}
+            />
+            <button
+              onClick={handelSignOut}
+              className="px-5 py-2 font-medium text-white bg-gradient-to-r from-red-500 to-orange-400 rounded-full shadow-md hover:scale-105 transition-all duration-300"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button className="px-6 py-2 font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-400 rounded-full shadow-md hover:scale-105 transition-all duration-300">
+            Sign In
+          </button>
+        )}
       </div>
 
       {/* Profile & Notifications */}

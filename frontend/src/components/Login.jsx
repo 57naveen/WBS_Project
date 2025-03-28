@@ -43,7 +43,7 @@ const Login = () => {
           password.current.value
         );
         const user = userCredential.user;
-        console.log("User created:", user.uid);
+        // console.log("User created:", user.uid);
 
         // Store user data in Firestore
         await setDoc(doc(db, "users", user.uid), {
@@ -51,7 +51,7 @@ const Login = () => {
           role: "user", // Default role
           createdAt: new Date(),
         });
-        console.log("Firestore document created for user:", user.uid);
+        // console.log("Firestore document created for user:", user.uid);
 
         // Get the Firebase auth token
       const token = await user.getIdToken();
@@ -68,7 +68,7 @@ const Login = () => {
           await auth.currentUser.reload();
           const updatedUser = auth.currentUser;
 
-          console.log("Profile updated successfully:", updatedUser.displayName);
+          // console.log("Profile updated successfully:", updatedUser.displayName);
 
           // Update Redux store
           dispatch(
@@ -90,11 +90,19 @@ const Login = () => {
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email.current.value, password.current.value);
         const user = userCredential.user;
-        console.log("User signed in:", user);
+        // console.log("User signed in:", user);
   
         // Get the Firebase auth token
         const token = await user.getIdToken();
         localStorage.setItem("firebase_token", token); // Store token for API requests
+
+        dispatch(
+          addUser({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || "",
+          })
+        );
   
         navigate("/dashboard");
       } catch (error) {

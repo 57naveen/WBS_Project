@@ -32,6 +32,7 @@
     "date-fns": "^4.1.0",
     "firebase": "^11.4.0",
     "framer-motion": "^12.5.0",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.479.0",
     "react": "^19.0.0",
     "react-circular-progressbar": "^2.2.0",

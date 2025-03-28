@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
-
+from django.utils import timezone
 from .models import Project, Task, Employee, TaskAssignment 
 from .serializers import ProjectSerializer, TaskSerializer, EmployeeSerializer, TaskAssignmentSerializer
 from .task_breakdown import get_project_information_and_breakdown
@@ -18,6 +18,13 @@ from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser
 import firebase_admin
 from firebase_admin import auth
+import google.generativeai as genai
+from django.conf import settings
+from datetime import date,datetime
+from django.apps import apps
+
+
+genai.configure(api_key=settings.GEMINI_API_KEY)
 
 # CRUD API Views
 class ProjectViewSet(viewsets.ModelViewSet):    
@@ -375,3 +382,121 @@ def update_task(request, task_id):
             "comment": task.comment,
         }
     }, status=200)
+
+
+
+# ✅ Helper function to convert dates to string
+def serialize_dates(obj):
+    if isinstance(obj, date):
+        return obj.strftime("%Y-%m-%d")  
+    raise TypeError("Type not serializable")
+
+@csrf_exempt
+def chatbot_view(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            query = data.get("query", "").strip().lower()
+
+            # Retrieve conversation history
+            conversation_history = request.session.get("chat_history", [])
+
+            # ✅ Detect Assign Task Command
+            if "assign task" in query and "to" in query:
+                parts = query.split("to")
+                task_name = parts[0].replace("assign task", "").strip()
+                employee_name = parts[1].strip()
+
+                task = Task.objects.filter(title__icontains=task_name, status="Pending").first()
+                employee = Employee.objects.filter(name__icontains=employee_name, availability=True, on_leave=False).first()
+
+                if task and employee:
+                    # Check if employee has reached the max workload
+                    if employee.workload >= employee.max_tasks_per_day:
+                        response_text = f"{employee.name} has reached the maximum workload and cannot take more tasks."
+                    else:
+                        # Assign task
+                        task.assigned_to = employee
+                        task.status = "Assigned"
+                        task.updated_at = timezone.now()
+                        task.save()
+
+                        # Update employee workload
+                        employee.workload += 1
+                        employee.updated_at = timezone.now()
+                        employee.save()
+
+                        response_text = f"Task '{task.title}' has been assigned to {employee.name}."
+                else:
+                    response_text = "Could not find the task or employee, or the employee is unavailable."
+
+            # ✅ Detect Change Task Status Command
+            elif "change status of" in query and "to" in query:
+                parts = query.split("to")
+                task_name = parts[0].replace("change status of", "").strip()
+                new_status = parts[1].strip()
+
+                task = Task.objects.filter(title__icontains=task_name).first()
+                if task:
+                    task.status = new_status.capitalize()
+                    task.save()
+                    response_text = f"Status of task '{task.title}' changed to {new_status}."
+                else:
+                    response_text = "Task not found. Please check the task name."
+
+            # ✅ Detect Update Project Deadline Command
+            elif "update deadline of" in query and "to" in query:
+                parts = query.split("to")
+                project_name = parts[0].replace("update deadline of", "").strip()
+                new_deadline = parts[1].strip()
+
+                try:
+                    new_deadline_date = datetime.strptime(new_deadline, "%Y-%m-%d").date()
+                    project = Project.objects.filter(name__icontains=project_name).first()
+                    if project:
+                        project.deadline = new_deadline_date
+                        project.save()
+                        response_text = f"Deadline for project '{project.name}' updated to {new_deadline}."
+                    else:
+                        response_text = "Project not found."
+                except ValueError:
+                    response_text = "Invalid date format. Use YYYY-MM-DD."
+
+            # ✅ If No Command, Use Gemini AI for Query Response
+            else:
+                projects = list(Project.objects.values("name", "description", "deadline"))
+                tasks = list(Task.objects.values("title", "status", "assigned_to__name", "updated_at"))
+                employees = list(Employee.objects.values("name", "role", "availability"))
+
+                context_data = {
+                    "projects": projects,
+                    "tasks": tasks,
+                    "employees": employees,
+                }
+                formatted_data = json.dumps(context_data, indent=2, default=serialize_dates)
+
+                prompt = f"""
+                You are an AI assistant for a project management system.
+                The manager is asking: "{query}"
+                Here is the relevant data:
+                {formatted_data}
+
+                Answer in a concise and accurate way.
+                """
+                model = genai.GenerativeModel("gemini-2.0-flash")
+                response = model.generate_content(prompt)
+                response_text = response.text
+
+            # ✅ Save Conversation History
+            conversation_history.append(f"User: {query}")
+            conversation_history.append(f"AI: {response_text}")
+            request.session["chat_history"] = conversation_history
+
+            return JsonResponse({"response": response_text})
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request method"}, status=400)

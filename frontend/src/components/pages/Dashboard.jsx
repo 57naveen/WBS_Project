@@ -30,8 +30,9 @@ import { useAuth } from "../../utils/AuthContext";
 import Login from "../Login";
 import AdminPanel from "../AdminPanel";
 import Employees from "../Employees";
+import Chatbot from "../Chatbot";
 
-const Dashboard = ({showAdminPanel}) => {
+const Dashboard = ({ showAdminPanel }) => {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
@@ -39,15 +40,12 @@ const Dashboard = ({showAdminPanel}) => {
   const [addProjectPopup, setAddProjectPopup] = useState(false);
   const [taskAssignment, setTaskAssignement] = useState([]);
   const { user, role, loading } = useAuth();
-  
+
   const userLogged = useSelector((state) => state.user);
 
-  console.log("user:",user);
-  console.log("role:",role);
-  // console.log("loading:",loading);
-
-
-  
+  // console.log("user:",user);
+  // console.log("role:",role);
+  // console.log("projectDetails:",projectDetails);
 
   // ✅ WebSocket Hook for real-time task updates
   const { data: webSocketTasks } = useWebSocket(
@@ -96,19 +94,19 @@ const Dashboard = ({showAdminPanel}) => {
   }, []);
 
   // ✅ Fetch project details
-  useEffect(() => {
-    const fetch_ProjectData = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/api/projects");
-        const json = await response.json();
-        // console.log("project data", json);
-        setProjectDetails(json);
-      } catch (error) {
-        console.error("Error fetching project details:", error);
-      }
-    };
-    fetch_ProjectData();
-  }, []);
+  // useEffect(() => {
+  //   const fetch_ProjectData = async () => {
+  //     try {
+  //       const response = await fetch("http://localhost:8000/api/projects");
+  //       const json = await response.json();
+  //       // console.log("project data", json);
+  //       setProjectDetails(json);
+  //     } catch (error) {
+  //       console.error("Error fetching project details:", error);
+  //     }
+  //   };
+  //   fetch_ProjectData();
+  // }, []);
 
   // ✅ Update tasks when new WebSocket data arrives
   useEffect(() => {
@@ -225,92 +223,85 @@ const Dashboard = ({showAdminPanel}) => {
 
   return (
     <DashboardLayout>
-       
-       {showAdminPanel && role === "admin" &&
-        <AdminPanel /> }
-     
-      {!userLogged && (
+      {showAdminPanel && role === "admin" && <AdminPanel />}
+
+      {/* {!userLogged && (
         <div className="absolute inset-0 flex justify-center items-center bg-black/10 backdrop-blur-sm z-[1000]">
           <Login />
         </div>
       )
-     }
+     } */}
 
+      {user && role === "employee" && <Employees />}
 
-     { user && role === "employee" && (
-     <Employees />
-     )}
- 
-  
+      {user && role === "manager" && (
+        <>
+          <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
 
-  {user && role === "manager" && (
-    <>
-    <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-    
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-    {stats.map((stat) => (
-      <StatsCard key={`${stat.title}-${stat.count}`} {...stat} />
-    ))}
-  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            {stats.map((stat) => (
+              <StatsCard key={`${stat.title}-${stat.count}`} {...stat} />
+            ))}
+          </div>
 
+          <div className="my-10">
+            <Chatbot />
+          </div>
 
+          {/* ✅ Projects Overview */}
+          <div className="bg-white p-6 rounded-lg shadow-md mt-6 ">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">
+              Projects Overview
+            </h2>
+            <button
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+              onClick={handleAddProject}
+            >
+              + Add Project
+            </button>
 
-     
-
-      {/* ✅ Projects Overview */}
-      <div className="bg-white p-6 rounded-lg shadow-md mt-6 ">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">
-          Projects Overview
-        </h2>
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
-          onClick={handleAddProject}
-        >
-          + Add Project
-        </button>
-
-        {/* Scrollable Projects Container */}
-        <div className="max-h-[300px] overflow-y-auto">
-          <div className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {projects.map((project) => (
-                <ProjectCard key={project.id} {...project} />
-              ))}
+            {/* Scrollable Projects Container */}
+            <div className="max-h-[300px] overflow-y-auto">
+              <div className="mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {projects.map((project) => (
+                    <ProjectCard key={project.id} {...project} />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {addProjectPopup && (
-        <AddProjectPopUp
-          onClose={() => setAddProjectPopup(false)}
-          onSubmit={(newProject) => {
-            // setProjects((prev) => [...prev, newProject]); // ✅ Update Projects
-            fetchProjects().then(setProjects);
-            fetchTasks().then(setTasks); // ✅ Refresh Tasks
-          }}
-        />
+          {addProjectPopup && (
+            <AddProjectPopUp
+              onClose={() => setAddProjectPopup(false)}
+              onSubmit={(newProject) => {
+                // setProjects((prev) => [...prev, newProject]); // ✅ Update Projects
+                fetchProjects().then(setProjects);
+                fetchTasks().then(setTasks); // ✅ Refresh Tasks
+              }}
+            />
+          )}
+
+          {/* ✅ Task Table */}
+          <div className="mt-6 mb-10">
+            <h1 className="text-2xl font-bold mb-4">Tasks</h1>
+            {/* {projectDetails.length > 0 && ( */}
+            <TaskTable key={tasks.length} data={tasks} projects={projects} />
+            {/* )} */}
+          </div>
+
+          {/* ✅ Team Members */}
+          <div className="mt-6 mb-10">
+            <h1 className="text-2xl font-bold mb-4">Team Members</h1>
+            <TeamMember
+              team={teamMembers}
+              tasks={tasks}
+              taskAssignment={taskAssignment}
+            />
+          </div>
+        </>
       )}
-
-      {/* ✅ Task Table */}
-      <div className="mt-6 mb-10">
-        <h1 className="text-2xl font-bold mb-4">Tasks</h1>
-        {projectDetails.length > 0 && (
-          <TaskTable key={tasks.length} data={tasks} projects={projects} />
-        )}
-      </div>
-
-      {/* ✅ Team Members */}
-      <div className="mt-6 mb-10">
-        <h1 className="text-2xl font-bold mb-4">Team Members</h1>
-        <TeamMember
-          team={teamMembers}
-          tasks={tasks}
-          taskAssignment={taskAssignment}
-        />
-      </div>
-      </>
-)}
     </DashboardLayout>
   );
 };

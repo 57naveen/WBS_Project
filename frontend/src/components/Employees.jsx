@@ -8,6 +8,13 @@ import { motion } from "framer-motion"; // For smooth animations
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { removeUser } from "@/utils/userSlice";
+import {jwtDecode} from "jwt-decode";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+
+
+
 
 const Employees = () => {
   const [employeeData, setEmployeeData] = useState(null);
@@ -19,6 +26,9 @@ const Employees = () => {
   const dispatch = useDispatch(); // ✅ Redux hook
   // const navigate = useNavigate(); // ✅ React Router hook for navigation
   const userLogged = useSelector((state) => state.user); // Get logged-in user
+
+ 
+  const navigate = useNavigate(); 
 
   const categorizedTasks = {
     Assigned: employeeData?.tasks.filter((task) => task.project?.id === selectedProject && task.status === "Assigned"),
@@ -61,29 +71,43 @@ const Employees = () => {
   const handleTaskUpdate = async (taskId) => {
     const updatedProgress = parseInt(taskUpdates[taskId]?.progress || 0, 10);
     const updatedComment = taskUpdates[taskId]?.comment || "";
-
+  
     if (updatedProgress < 1 || updatedProgress > 100) {
-      alert("Progress must be between 1 and 100.");
+      // alert("Progress must be between 1 and 100.");
+      toast.warning("Please add the task progress status")
       return;
     }
-
-    // ✅ Check if task is already completed before making an API request
+  
     const taskToUpdate = employeeData.tasks.find((task) => task.id === taskId);
     if (taskToUpdate?.status === "Completed") {
-      alert("⚠️ Task is already marked as completed. No further updates allowed.");
+      // alert("⚠️ Task is already marked as completed. No further updates allowed.");
+      toast.warning("Task is already marked as completed. No further updates allowed.")
       return;
     }
-
+  
     try {
       const token = localStorage.getItem("firebase_token");
       if (!token) {
-        console.error("❌ No Firebase token found!");
-        alert("Session expired. Please log in again.");
-        dispatch(removeUser()); // ✅ Remove user from Redux store
-        // navigate("/login"); // ✅ Redirect to login page
+        console.warn("No token found! Redirecting to login...");
+        handleLogout();
         return;
       }
-
+  
+      // ✅ Check token expiration
+      try {
+        const decodedToken = jwtDecode(token);
+        if (decodedToken.exp * 1000 < Date.now()) {
+          console.warn("Token expired! Logging out...");
+          handleLogout();
+          return;
+        }
+      } catch (error) {
+        console.error("Invalid token format:", error);
+        handleLogout();
+        return;
+      }
+  
+      // ✅ Proceed with API request
       const response = await fetch(`http://127.0.0.1:8000/api/update-task/${taskId}/`, {
         method: "PATCH",
         headers: {
@@ -92,34 +116,31 @@ const Employees = () => {
         },
         body: JSON.stringify({ progress: updatedProgress, comment: updatedComment }),
       });
-
+  
       if (response.status === 401 || response.status === 403) {
         console.error("❌ Unauthorized or token expired. Redirecting to login...");
-        alert("Session expired. Please log in again.");
-        localStorage.removeItem("firebase_token"); // ✅ Clear expired token
-        // navigate("/login"); // ✅ Redirect to login page
-        dispatch(removeUser());
+        toast.error("Unauthorized or token expired. Redirecting to login...")
+        handleLogout();
         return;
       }
-
+  
       if (!response.ok) {
         throw new Error(`HTTP Error! Status: ${response.status}`);
       }
-
+  
       const data = await response.json();
       console.log("✅ Task Updated:", data);
-
+  
       if (!data.task) {
         console.error("❌ No task data returned from backend.");
         return;
       }
-
-      // ✅ If progress is 100%, mark task as "Completed"
+  
       if (updatedProgress === 100) {
-        alert("🎉 Task marked as completed!");
+        // alert("🎉 Task marked as completed!");
+        // toast.alert("Task marked as completed!");
       }
-
-      // ✅ Update UI
+  
       setEmployeeData((prev) => ({
         ...prev,
         tasks: prev.tasks.map((task) =>
@@ -131,6 +152,17 @@ const Employees = () => {
     } catch (err) {
       console.error("❌ Error updating task:", err);
     }
+  };
+  
+  // ✅ Centralized function to handle logout
+  const handleLogout = () => {
+    toast.error("Session expired. Redirecting to login...");
+  
+    setTimeout(() => {
+      localStorage.removeItem("firebase_token");
+      dispatch(removeUser());
+      navigate("/");
+    }, 3000); // ✅ Redirect after 3 seconds
   };
 
   if (!employeeData)

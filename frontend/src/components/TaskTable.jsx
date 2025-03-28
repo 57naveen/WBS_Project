@@ -3,6 +3,8 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 const TaskTable = ({ data,projects }) => {
+
+  // console.log("Projects",projects);
   const [rowSelection, setRowSelection] = useState({});
 
   // Toggle selection state
@@ -12,6 +14,7 @@ const TaskTable = ({ data,projects }) => {
       [rowId]: !prev[rowId],
     }));
   };
+  
 
 // const socket = new WebSocket("ws://localhost:8000/ws/task_updates/");
 
@@ -149,6 +152,8 @@ const TaskTable = ({ data,projects }) => {
         {data.map((task, index) => {
           // Find the matching project for the current task
           const taskProject = projects.find(proj => proj.id === task.project_id) || null;
+
+          // console.log("taskProject",taskProject);
 
           
             if (!taskProject) {
