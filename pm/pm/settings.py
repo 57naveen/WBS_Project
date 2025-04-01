@@ -45,7 +45,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['wbs-project-gn4r.onrender.com', 'localhost', '127.0.0.1']
 
 
 # Application definition
