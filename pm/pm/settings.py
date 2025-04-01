@@ -68,6 +68,10 @@ INSTALLED_APPS = [
 
 
 ASGI_APPLICATION = "pm.asgi.application"
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -137,6 +141,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 CORS_ALLOWED_ORIGINS = [
+    "https://workbreaksystem.web.app"
     "http://localhost:5173",
     "http://127.0.0.1:3000",  # Update with your React URL
 ]
