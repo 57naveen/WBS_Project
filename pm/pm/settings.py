@@ -76,7 +76,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],  # Ensure this is the correct Redis
+            "hosts": [os.getenv("REDIS_URL", "redis://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")],
         },
     },
 }
@@ -189,7 +189,7 @@ DATABASES = {
 
 
 # Celery Configuration
-CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Use Redis as message broker
+CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # Using Redis to store results
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
