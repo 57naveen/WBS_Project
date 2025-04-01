@@ -19,7 +19,7 @@ from firebase_admin import credentials
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 
-# load_dotenv() 
+load_dotenv() 
 # db_url = os.getenv("DATABASE_URL")
 # parsed_url = urlparse(db_url)
 
@@ -40,14 +40,13 @@ firebase_admin.initialize_app(cred)
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-z)w*inz9^41(ler1_707uvos-bpq+iwt*%sh*d(^$_*u!yl&*0'
 
-GEMINI_API_KEY = ""
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
 # Application definition
 
