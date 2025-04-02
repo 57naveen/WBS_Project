@@ -209,13 +209,13 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     "visibility_timeout": 3600,  # 1 hour timeout for tasks
     "ssl": {
-        "ssl_cert_reqs": "CERT_NONE"  # Change to "CERT_REQUIRED" for strict SSL
+        "ssl_cert_reqs": "CERT_REQUIRED"  # Change to "CERT_REQUIRED" for strict SSL
     }
 }
 
 # ✅ Add SSL options for Celery Results Backend
 CELERY_REDIS_BACKEND_USE_SSL = {
-    "ssl_cert_reqs": "CERT_NONE"  # Change to "CERT_REQUIRED" for strict SSL
+    "ssl_cert_reqs": "CERT_REQUIRED"  # Change to "CERT_REQUIRED" for strict SSL
 }
 
 # Celery Beat Scheduler
