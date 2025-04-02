@@ -207,7 +207,7 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 CELERY_REDIS_BACKEND_USE_SSL = {
-    "ssl_cert_reqs": "CERT_NONE"  # ✅ Required for Upstash Redis
+    "ssl_cert_reqs": "CERT_REQUIRED"  # Enforces SSL certificate validation
 }
 
 
