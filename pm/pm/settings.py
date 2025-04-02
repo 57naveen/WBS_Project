@@ -193,8 +193,8 @@ DATABASES = {
 
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")
-CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")  # Using Redis to store results
+CELERY_BROKER_URL = os.getenv("REDIS_URL", "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")
+CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")  # Using Redis to store results
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
@@ -206,8 +206,9 @@ CELERY_BEAT_SCHEDULE = {
     }
 }
 
+# ✅ Properly configure SSL to enforce secure connections
 CELERY_REDIS_BACKEND_USE_SSL = {
-    "ssl_cert_reqs": "CERT_REQUIRED"  # Enforces SSL certificate validation
+    "ssl_cert_reqs": "CERT_REQUIRED"  # This ensures SSL certificate validation
 }
 
 
