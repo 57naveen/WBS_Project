@@ -206,6 +206,10 @@ CELERY_BEAT_SCHEDULE = {
     }
 }
 
+CELERY_REDIS_BACKEND_USE_SSL = {
+    "ssl_cert_reqs": "CERT_NONE"  # ✅ Required for Upstash Redis
+}
+
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"  # Replace with your SMTP server
