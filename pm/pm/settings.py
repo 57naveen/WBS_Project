@@ -192,11 +192,31 @@ DATABASES = {
 
 
 
-# Celery Configuration
-CELERY_BROKER_URL = os.getenv("REDIS_URL", "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")
-CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")  # Using Redis to store results
+CELERY_BROKER_URL = os.getenv(
+    "REDIS_URL",
+    "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379"
+)
+
+CELERY_RESULT_BACKEND = os.getenv(
+    "REDIS_URL",
+    "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379"
+)
+
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+# ✅ Add SSL options for Celery Broker
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "visibility_timeout": 3600,  # 1 hour timeout for tasks
+    "ssl": {
+        "ssl_cert_reqs": "CERT_NONE"  # Change to "CERT_REQUIRED" for strict SSL
+    }
+}
+
+# ✅ Add SSL options for Celery Results Backend
+CELERY_REDIS_BACKEND_USE_SSL = {
+    "ssl_cert_reqs": "CERT_NONE"  # Change to "CERT_REQUIRED" for strict SSL
+}
 
 # Celery Beat Scheduler
 CELERY_BEAT_SCHEDULE = {
@@ -205,12 +225,6 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute="*/5"),  # Runs every 5 minutes
     }
 }
-
-# ✅ Properly configure SSL to enforce secure connections
-CELERY_REDIS_BACKEND_USE_SSL = {
-    "ssl_cert_reqs": "CERT_REQUIRED"  # This ensures SSL certificate validation
-}
-
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"  # Replace with your SMTP server
