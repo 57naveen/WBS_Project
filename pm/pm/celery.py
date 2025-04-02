@@ -20,3 +20,8 @@ if __name__ == '__main__':
 
 # Auto-discover tasks from installed apps.
 app.autodiscover_tasks()
+
+# ✅ Fix: Force Celery to use a safer multiprocessing method on Windows
+if os.name == 'nt':  # Windows
+    import multiprocessing
+    multiprocessing.set_start_method('spawn', force=True)
