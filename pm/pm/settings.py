@@ -114,19 +114,22 @@ CORS_ALLOW_CREDENTIALS = True  # ✅ This is required to send cookies
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_HTTPONLY = True
 # CORS_ALLOW_ALL_ORIGINS = True 
 ROOT_URLCONF = "pm.urls" 
 
 CORS_ALLOW_HEADERS = [
+    "content-type",  # ✅ Allow Content-Type
     "authorization",
-    "content-type",
-    "accept",
-    "x-csrftoken",
     "x-requested-with",
+    "accept",
+    "origin",
+    "user-agent",
+    "referer",
+    "accept-encoding",
+    "accept-language",
 ]
 
-CORS_ALLOW_METHODS = ["*"]
 
 CORS_ALLOW_METHODS = [
     "GET",
@@ -142,7 +145,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 CORS_ALLOWED_ORIGINS = [
-    "https://workbreaksystem.web.app"
+    "https://workbreaksystem.web.app",
     "http://localhost:5173",
     "http://127.0.0.1:3000",  # Update with your React URL
 ]
