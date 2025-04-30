@@ -11,7 +11,7 @@ import { removeUser } from "@/utils/userSlice";
 import {jwtDecode} from "jwt-decode";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import { BACKEND_URL } from "@/constants";
 
 
 
@@ -45,7 +45,7 @@ const Employees = () => {
       }
 
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/get-employee-data/", {
+        const response = await fetch(`${BACKEND_URL}/api/get-employee-data/`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -108,7 +108,7 @@ const Employees = () => {
       }
   
       // ✅ Proceed with API request
-      const response = await fetch(`http://127.0.0.1:8000/api/update-task/${taskId}/`, {
+      const response = await fetch(`${BACKEND_URL}/api/update-task/${taskId}/`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -166,7 +166,7 @@ const Employees = () => {
   };
 
   if (!employeeData)
-    return <p className="text-center text-lg font-semibold text-white">Loading employee details...</p>;
+    return <p className="text-center text-lg font-semibold text-black">Loading employee details...</p>;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">

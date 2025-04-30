@@ -2,8 +2,7 @@ import { FaBell, FaSearch } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { auth } from "../utils/firebase";
-import { signOut } from "firebase/auth";
-import { onAuthStateChanged } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import { addUser, removeUser } from "../utils/userSlice";
 import { useNavigate } from "react-router-dom";
 import userLogo from "../images/user.png";
@@ -16,16 +15,13 @@ const Header = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get current date
     const date = new Date();
     const day = date.toLocaleDateString("en-US", { weekday: "long" });
     const month = date.toLocaleDateString("en-US", { month: "long" });
     const dayNum = date.getDate();
     const year = date.getFullYear();
-
     setCurrentDate(`${day}, ${dayNum} ${month} ${year}`);
 
-    // Set dynamic greeting
     const hour = date.getHours();
     if (hour >= 5 && hour < 12) {
       setGreeting("Good morning");
@@ -39,94 +35,69 @@ const Header = () => {
   const handelSignOut = () => {
     signOut(auth)
       .then(() => {})
-      .catch((error) => {
-        navigate("/error");
-      });
+      .catch(() => navigate("/error"));
   };
 
-  // Using the useEffect to call this APi at initial render
   useEffect(() => {
-    //This function  return the user object
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        //sign In
-
-        // getting this object from firebase
         const { uid, email, displayName } = user;
-
-        //inserting the user object into our slice using dispatch function
-        dispatch(addUser({ uid: uid, email: email, displayName: displayName }));
+        dispatch(addUser({ uid, email, displayName }));
         navigate("/dashboard");
       } else {
-        //sign out
-
-        // when user signed out remove the user data from the slice
         dispatch(removeUser());
         navigate("/dashboard");
       }
     });
 
-    // unsubscribe when component unmounts
     return () => unsubscribe();
   }, []);
 
   return (
-    <div className="flex justify-between items-center bg-gradient-to-r from-blue-500 to-purple-500 p-4 shadow-lg rounded-b-2xl">
-      {/* Greeting & Date */}
-      <div>
-        <h1 className="text-xl font-bold text-white">
-          {greeting},{" "}
-          <span className="uppercase text-amber-300">{user?.displayName} </span>
-        </h1>
-        <p className="text-gray-200">{currentDate}</p>
-      </div>
+<div className="w-full bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-3 shadow-lg rounded-b-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  {/* Top: Greeting & Date */}
+  <div className="text-white">
+    <p className="text-sm font-semibold">
+      {greeting},{" "}
+      <span className="uppercase text-amber-300">{user?.displayName}</span>
+    </p>
+    <p className="text-xs text-gray-200">{currentDate}</p>
+  </div>
 
-      {/* Search Bar */}
-      <div className="flex items-center ml-40 bg-white px-4 py-2 rounded-full shadow-sm">
-        <FaSearch className="text-gray-500" />
-        <input
-          type="text"
-          placeholder="Search..."
-          className="bg-transparent outline-none pl-2 text-gray-700"
-        />
-      </div>
-      <div className="ml-auto flex items-center gap-4 mx-2">
-        {user ? (
-          <div className="flex items-center gap-4">
-            <img
-              className="w-10 h-10 rounded-full border-2 border-white shadow-lg"
-              alt="User Icon"
-              src={userLogo}
-            />
-            <button
-              onClick={handelSignOut}
-              className="px-5 py-2 font-medium text-white bg-gradient-to-r from-red-500 to-orange-400 rounded-full shadow-md hover:scale-105 transition-all duration-300"
-            >
-              Sign Out
-            </button>
-          </div>
-        ) : (
-          <button className="px-6 py-2 font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-400 rounded-full shadow-md hover:scale-105 transition-all duration-300">
-            Sign In
-          </button>
-        )}
-      </div>
+  {/* Middle: Search bar (hidden on mobile) */}
+  <div className="hidden sm:flex items-center bg-white px-3 py-1.5 rounded-full shadow-sm">
+    <FaSearch className="text-gray-500 text-sm" />
+    <input
+      type="text"
+      placeholder="Search..."
+      className="bg-transparent outline-none pl-2 text-gray-700 text-sm w-40"
+    />
+  </div>
 
-      {/* Profile & Notifications */}
-      <div className="flex items-center space-x-4">
-        <div className="relative cursor-pointer">
-          <FaBell className="text-2xl text-white hover:text-yellow-300 transition duration-300" />
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-            3
-          </span>
-        </div>
-        {/* <img
-          src="https://via.placeholder.com/40" // Replace with real user image
-          alt="User Avatar"
-          className="w-10 h-10 rounded-full border-2 border-white cursor-pointer"
-        /> */}
-      </div>
+  {/* Bottom (mobile) / Right (desktop): Notification, Avatar, Sign Out */}
+  <div className="flex items-center gap-3">
+    <div className="relative cursor-pointer">
+      <FaBell className="text-white text-lg hover:text-yellow-300 transition" />
+      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1 py-0.5 rounded-full">
+        3
+      </span>
     </div>
+
+    <img
+      src={userLogo}
+      alt="User Icon"
+      className="w-8 h-8 rounded-full border-2 border-white shadow"
+    />
+
+    <button
+      onClick={handelSignOut}
+      className="text-xs font-medium text-white bg-gradient-to-r from-red-500 to-orange-400 px-4 py-1.5 rounded-full shadow hover:scale-105 transition"
+    >
+      Sign Out
+    </button>
+  </div>
+</div>
+
   );
 };
 

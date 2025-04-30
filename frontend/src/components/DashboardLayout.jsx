@@ -13,7 +13,7 @@ const DashboardLayout = ({ children }) => {
         <Header />
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-100">
           {children}
         </div>
       </div>

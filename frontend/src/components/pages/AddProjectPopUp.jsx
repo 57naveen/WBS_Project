@@ -1,3 +1,4 @@
+import { BACKEND_URL } from "@/constants";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -29,7 +30,7 @@ const AddProjectPopUp = ({onClose, onSubmit }) => {
     // console.log("📤 Sending data:", projectData);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/task-breakdown/", {
+      const response = await fetch(`${BACKEND_URL}/api/task-breakdown/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

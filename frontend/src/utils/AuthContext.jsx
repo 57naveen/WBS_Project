@@ -19,15 +19,15 @@ export const AuthProvider = ({ children }) => {
         try {
           const userRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userRef);
-
+        
           if (userSnap.exists()) {
             setRole(userSnap.data().role);
           } else {
             console.warn("User document not found in Firestore");
-            setRole("pending"); // Mark role as "pending" instead of null
+            setRole("pending");
           }
         } catch (error) {
-          console.error("Error fetching user role:", error);
+          console.error("Error fetching user role:", error.message);
           setRole(null);
         }
       } else {

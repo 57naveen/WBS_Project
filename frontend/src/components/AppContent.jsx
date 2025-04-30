@@ -55,7 +55,7 @@ const AppContent = () => {
       <div className="flex">
         {userLogged && <Sidebar setShowAdminPanel={setShowAdminPanel} />}
         <div className="flex-1">
-          <main className="p-6">
+          <main className="p-2">
             <Routes>
               <Route path="/" element={userLogged ? <Dashboard /> : <Login />} />
               <Route path="/dashboard" element={userLogged ? <Dashboard showAdminPanel={showAdminPanel} /> : <Login />} />

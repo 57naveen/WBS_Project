@@ -1,6 +1,7 @@
+import { BACKEND_URL } from "@/constants";
 import axios from "axios";
 
-const BASE_URL = "http://127.0.0.1:8000/api"; // Update with your backend URL
+const BASE_URL = `${BACKEND_URL}/api`; // Update with your backend URL
 
 export const fetchProjects = async () => {
   try {

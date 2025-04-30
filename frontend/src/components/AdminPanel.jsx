@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { db } from "../utils/firebase"; 
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { useAuth } from "../utils/AuthContext";
 
 const AdminPanel = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user, role, loading: authLoading } = useAuth(); // use role too
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -20,6 +22,11 @@ const AdminPanel = () => {
 
     fetchUsers(); 
   }, []);
+
+
+  useEffect(() => {
+    console.log("Logged-in user:", user?.email, "Role:", role);
+  }, [user, role]);
 
   const handleRoleChange = async (userId, newRole) => {
     try {
@@ -39,6 +46,10 @@ const AdminPanel = () => {
       alert("Failed to update role.");
     }
   };
+
+  if (!authLoading && role !== "admin") {
+    return <p>Access Denied. Admins only.</p>;
+  }
 
   if (loading) return <p>Loading users...</p>;
 

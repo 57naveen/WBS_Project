@@ -52,6 +52,9 @@ const Dashboard = ({ showAdminPanel }) => {
     "ws://127.0.0.1:8000/ws/tasks/"
   );
 
+  //127.0.0.1:8000
+  // "wss://wbs-project-gn4r.onrender.com/ws/tasks/"
+
   // console.log("Task", tasks);
   // console.log("TaskAssigment", taskAssignment);
 
@@ -185,9 +188,8 @@ const Dashboard = ({ showAdminPanel }) => {
 
   const StatsCard = ({ title, count, percentage, color }) => {
     return (
-      <div className="flex flex-col items-center bg-white shadow-lg p-6 rounded-2xl transition-transform hover:scale-105 border border-gray-200">
-        {/* Circular Progress Bar */}
-        <div className="w-28 h-24 mb-5">
+      <div className="flex flex-col items-center justify-between bg-white shadow-lg px-3 py-4 rounded-2xl transition-transform hover:scale-105 border border-gray-200 w-full">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4">
           <CircularProgressbar
             value={parseFloat(percentage)}
             text={`${percentage}%`}
@@ -195,14 +197,15 @@ const Dashboard = ({ showAdminPanel }) => {
               pathColor: color,
               textColor: "#333",
               trailColor: "#f3f3f3",
-              textSize: "16px",
+              textSize: "14px",
             })}
           />
         </div>
-
-        {/* Stat Details */}
-        <h3 className="text-lg font-bold text-gray-700">{title}</h3>
-        <p className="text-xl font-semibold text-gray-900">{count}</p>
+  
+        <h3 className="text-sm sm:text-base font-semibold text-gray-700 text-center">
+          {title}
+        </h3>
+        <p className="text-lg sm:text-xl font-bold text-gray-900">{count}</p>
       </div>
     );
   };
@@ -221,6 +224,10 @@ const Dashboard = ({ showAdminPanel }) => {
   //   setProjectData(data);
   // };
 
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
   return (
     <DashboardLayout>
       {showAdminPanel && role === "admin" && <AdminPanel />}
@@ -238,18 +245,20 @@ const Dashboard = ({ showAdminPanel }) => {
         <>
           <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-            {stats.map((stat) => (
-              <StatsCard key={`${stat.title}-${stat.count}`} {...stat} />
-            ))}
-          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 px-2">
+          {stats.map((stat) => (
+  <div className="min-w-[150px] flex-shrink-0">
+    <StatsCard key={`${stat.title}-${stat.count}`} {...stat} />
+  </div>
+))}
+</div>
 
           <div className="my-10">
             <Chatbot />
           </div>
 
           {/* ✅ Projects Overview */}
-          <div className="bg-white p-6 rounded-lg shadow-md mt-6 ">
+          <div className="bg-white p-5 rounded-lg shadow-md mt-6 ">
             <h2 className="text-xl font-bold mb-4 text-gray-800">
               Projects Overview
             </h2>
