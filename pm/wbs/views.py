@@ -20,8 +20,23 @@ import firebase_admin
 from firebase_admin import auth
 import google.generativeai as genai
 from django.conf import settings
-from datetime import date,datetime
+# from datetime import date,datetime
 from django.apps import apps
+from django.db import connection
+import logging
+logger = logging.getLogger(__name__)
+from django.conf import settings
+import re
+from datetime import datetime, date
+from decimal import Decimal
+from rest_framework import generics
+
+
+
+# GEMINI_API_KEY = settings.GEMINI_API_KEY
+GEMINI_API_URL = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}'
+import requests
+
 
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -42,6 +57,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 class TaskAssignmentViewSet(viewsets.ModelViewSet):
     queryset = TaskAssignment.objects.all()
     serializer_class = TaskAssignmentSerializer
+    
 
 
 # AI Task Breakdown API
@@ -392,111 +408,261 @@ def serialize_dates(obj):
     raise TypeError("Type not serializable")
 
 @csrf_exempt
-def chatbot_view(request):
-    if request.method == "POST":
+def chatbot_query(request):
+    """Handles the chatbot query and returns the SQL query results."""
+    if request.method == 'POST':
         try:
+            # Load the incoming data
             data = json.loads(request.body)
-            query = data.get("query", "").strip().lower()
+            query = data.get('query')
 
-            # Retrieve conversation history
-            conversation_history = request.session.get("chat_history", [])
+            # Validate if the query is present
+            if not query:
+                return JsonResponse({'error': 'Missing "query" parameter in the request.'}, status=400)
 
-            # ✅ Detect Assign Task Command
-            if "assign task" in query and "to" in query:
-                parts = query.split("to")
-                task_name = parts[0].replace("assign task", "").strip()
-                employee_name = parts[1].strip()
+            # Log the received query for debugging
+            logger.debug(f"Received query: {query}")
 
-                task = Task.objects.filter(title__icontains=task_name, status="Pending").first()
-                employee = Employee.objects.filter(name__icontains=employee_name, availability=True, on_leave=False).first()
+            # Step 1: Get SQL query from Gemini
+            sql_query = get_sql_from_gemini(query)
+            if "Sorry" in sql_query:
+                return JsonResponse({'error': 'Failed to generate SQL query from Gemini.'}, status=500)
 
-                if task and employee:
-                    # Check if employee has reached the max workload
-                    if employee.workload >= employee.max_tasks_per_day:
-                        response_text = f"{employee.name} has reached the maximum workload and cannot take more tasks."
-                    else:
-                        # Assign task
-                        task.assigned_to = employee
-                        task.status = "Assigned"
-                        task.updated_at = timezone.now()
-                        task.save()
+            # Log the SQL query for debugging
+            logger.debug(f"Generated SQL query: {sql_query}")
 
-                        # Update employee workload
-                        employee.workload += 1
-                        employee.updated_at = timezone.now()
-                        employee.save()
+            # Step 2: Execute the SQL query and get results
+            query_results = execute_sql_query(sql_query)
+            if not query_results:
+                return JsonResponse({'error': 'No results found for the query.'}, status=404)
 
-                        response_text = f"Task '{task.title}' has been assigned to {employee.name}."
-                else:
-                    response_text = "Could not find the task or employee, or the employee is unavailable."
+            # Log the query results for debugging
+            logger.debug(f"Query results: {query_results}")
 
-            # ✅ Detect Change Task Status Command
-            elif "change status of" in query and "to" in query:
-                parts = query.split("to")
-                task_name = parts[0].replace("change status of", "").strip()
-                new_status = parts[1].strip()
+            # Step 3: Get a human-readable response from Gemini
+            human_answer = get_human_answer_from_gemini(query_results, query)
+            if "Sorry" in human_answer:
+                return JsonResponse({'error': 'Failed to generate a human-readable response from Gemini.'}, status=500)
 
-                task = Task.objects.filter(title__icontains=task_name).first()
-                if task:
-                    task.status = new_status.capitalize()
-                    task.save()
-                    response_text = f"Status of task '{task.title}' changed to {new_status}."
-                else:
-                    response_text = "Task not found. Please check the task name."
-
-            # ✅ Detect Update Project Deadline Command
-            elif "update deadline of" in query and "to" in query:
-                parts = query.split("to")
-                project_name = parts[0].replace("update deadline of", "").strip()
-                new_deadline = parts[1].strip()
-
-                try:
-                    new_deadline_date = datetime.strptime(new_deadline, "%Y-%m-%d").date()
-                    project = Project.objects.filter(name__icontains=project_name).first()
-                    if project:
-                        project.deadline = new_deadline_date
-                        project.save()
-                        response_text = f"Deadline for project '{project.name}' updated to {new_deadline}."
-                    else:
-                        response_text = "Project not found."
-                except ValueError:
-                    response_text = "Invalid date format. Use YYYY-MM-DD."
-
-            # ✅ If No Command, Use Gemini AI for Query Response
-            else:
-                projects = list(Project.objects.values("name", "description", "deadline"))
-                tasks = list(Task.objects.values("title", "status", "assigned_to__name", "updated_at"))
-                employees = list(Employee.objects.values("name", "role", "availability"))
-
-                context_data = {
-                    "projects": projects,
-                    "tasks": tasks,
-                    "employees": employees,
-                }
-                formatted_data = json.dumps(context_data, indent=2, default=serialize_dates)
-
-                prompt = f"""
-                You are an AI assistant for a project management system.
-                The manager is asking: "{query}"
-                Here is the relevant data:
-                {formatted_data}
-
-                Answer in a concise and accurate way.
-                """
-                model = genai.GenerativeModel("gemini-2.0-flash")
-                response = model.generate_content(prompt)
-                response_text = response.text
-
-            # ✅ Save Conversation History
-            conversation_history.append(f"User: {query}")
-            conversation_history.append(f"AI: {response_text}")
-            request.session["chat_history"] = conversation_history
-
-            return JsonResponse({"response": response_text})
+            # Return the response
+            return JsonResponse({'response': human_answer})
 
         except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON format"}, status=400)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+            # Handle JSON decoding errors
+            logger.error("Invalid JSON format in request.")
+            return JsonResponse({'error': 'Invalid JSON format in the request.'}, status=400)
 
-    return JsonResponse({"error": "Invalid request method"}, status=400)
+        except Exception as e:
+            # Log the exception and return a generic error message
+            logger.error(f"An error occurred: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+
+@csrf_exempt
+def get_sql_from_gemini(manager_query):
+    """Get SQL query from Gemini model based on manager question."""
+    prompt = f"""
+    You are an expert SQL assistant. Your task is to generate a clean, executable **PostgreSQL query** for a Django backend using the schema below. Return **only the raw SQL**, without code blocks or explanation.
+
+    Schema:
+
+    1. wbs_project (
+        id, name, description, deadline, created_at, updated_at
+    )
+
+    2. wbs_employee (
+        id, name, email, role, manager_id, availability, on_leave,
+        workload, max_tasks_per_day, performance_rating,
+        skills, created_at, updated_at
+    )
+
+    3. wbs_task (
+        id, title, description, project_id, assigned_to_id, deadline,
+        status, priority, required_skills, created_at, updated_at,
+        progress, comment
+    )
+
+    4. wbs_taskassignment (
+        id, task_id, employee_id, assigned_date, status,
+        created_at, updated_at
+    )
+
+    Relationships:
+    - wbs_task.project_id → wbs_project.id
+    - wbs_task.assigned_to_id → wbs_employee.id
+    - wbs_taskassignment.task_id → wbs_task.id
+    - wbs_taskassignment.employee_id → wbs_employee.id
+    - wbs_employee.manager_id → wbs_employee.id (self-referencing)
+    - Each Task is linked to a Project.
+    - Each Task is optionally assigned to an Employee.
+    - TaskAssignment explicitly records task assignment events.
+    - Each Employee can optionally have a Manager (another Employee).
+
+    Instructions:
+    - Match employees by name when mentioned.
+    - Match tasks by title when mentioned.
+    - If counting is requested, return a `SELECT COUNT(*)`.
+    - If grouping is needed (e.g., by project, status), use `GROUP BY`.
+    - Always join tables if needed (e.g., when referring to task titles, employee names, or project names).
+    - Output only one correct SQL query. No commentary, markdown, or explanations.
+    - If the user mentions a name, use `ILIKE '%<name>%'` in WHERE clauses.
+    - If no match is found in subqueries, ensure query does not fail—return zero rows.
+    - When counting, use `COUNT(*)` and give meaningful aliases.
+    - Always join related tables where needed (e.g., `wbs_task.assigned_to_id` with `wbs_employee.id`).
+
+    User Question: "{manager_query}"
+    """
+
+    headers = {
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(GEMINI_API_URL, headers=headers, json=data)
+
+    logger.debug(f"Raw response from Gemini (SQL generation): {response.text}")
+
+    if response.status_code == 200:
+        gemini_response = response.json()
+        candidates = gemini_response.get("candidates", [])
+        if candidates:
+            sql_text = candidates[0]['content']['parts'][0]['text']
+
+            # --- NEW: clean the SQL ---
+            # Remove triple backticks and 'sql' keywords
+            sql_text = re.sub(r'```sql|```', '', sql_text, flags=re.IGNORECASE).strip()
+
+            logger.debug(f"Cleaned SQL query: {sql_text}")
+            return sql_text
+        else:
+            return "No response from Gemini."
+    else:
+        logger.error(f"Error from Gemini API: {response.status_code} - {response.text}")
+        return f"Error: {response.status_code} - {response.text}"
+    
+
+
+    
+def get_human_answer_from_gemini(query_results, manager_query):
+    """Decide between structured JSON or natural language based on the query."""
+    results_json = json.dumps(query_results)
+
+    # Define keywords that should return structured task JSON
+    structured_keywords = [
+        "break", "split", "convert", "structure", "extract tasks", "task breakdown"
+    ]
+
+    # Check if query requires structured output
+    is_structured = any(keyword in manager_query.lower() for keyword in structured_keywords)
+
+    if is_structured:
+        prompt = f"""
+        You are a project assistant. Based on the following data:
+
+        {results_json}
+
+        And the original question:
+        "{manager_query}"
+
+        Output a JSON array of tasks. Each task must have:
+        - title
+        - description
+        - assigned_to_id
+        - required_skills (list of strings)
+
+        Only return valid JSON. No extra explanation.
+        """
+    else:
+        prompt = f"""
+        You are a helpful assistant for a project manager.
+
+        Here is the data from the database:
+        {results_json}
+
+        And the user's question:
+        "{manager_query}"
+
+        Write a clear and concise natural language answer based on the data.
+        """
+
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(GEMINI_API_URL, headers=headers, json=data)
+
+    logger.debug(f"Raw response from Gemini: {response.text}")
+
+    if response.status_code == 200:
+        try:
+            gemini_response = response.json()
+            candidates = gemini_response.get("candidates", [])
+            if candidates:
+                text = candidates[0]['content']['parts'][0]['text']
+                if is_structured:
+                    # Strip markdown if present
+                    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE)
+                    try:
+                        structured_data = json.loads(text)
+                        return {"tasks": structured_data}
+                    except Exception as e:
+                        logger.error(f"JSON parsing error: {e}")
+                        return {"response": "Failed to parse structured JSON from Gemini."}
+                else:
+                    return {"response": text}
+            else:
+                return {"response": "No answer from Gemini."}
+        except Exception as e:
+            logger.error(f"Gemini response parsing failed: {e}")
+            return {"response": "Gemini API returned invalid format."}
+    else:
+        logger.error(f"Gemini API error: {response.status_code} - {response.text}")
+        return {"response": f"Error: {response.status_code} - {response.text}"}
+
+def serialize_value(value):
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+def execute_sql_query(sql_query):
+    """Execute the SQL query and return the results."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql_query)
+            results = cursor.fetchall()
+            columns = [col[0] for col in cursor.description]
+            results_dict = [
+                {col: serialize_value(val) for col, val in zip(columns, row)}
+                for row in results
+            ]
+            return results_dict
+    except Exception as e:
+        logger.error(f"SQL execution error: {e}")
+        return str(e)
+    
+
+
+class TaskUpdateView(generics.UpdateAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    lookup_field = 'pk'

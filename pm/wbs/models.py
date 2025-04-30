@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class Project(models.Model):
     """Stores project details."""
@@ -69,13 +70,16 @@ class Task(models.Model):
     progress = models.IntegerField(default=0)  # ✅ Add Progress Field
     comment = models.TextField(blank=True, null=True)  # ✅ Add Comment Field
 
-    def save(self, *args, **kwargs):
-        """Ensure task deadline is within project deadline."""
-        if self.progress == 100:  
-            self.status = "Completed"  # ✅ Auto-update status when 100%
-            
+    def clean(self):
         if self.project and self.deadline > self.project.deadline:
-            raise ValueError("Task deadline cannot be later than the project's deadline.")
+            raise ValidationError("Task deadline cannot be later than the project's deadline.")
+        if not (0 <= self.progress <= 100):
+            raise ValidationError("Progress must be between 0 and 100.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # ✅ Run validations including `clean()`
+        if self.progress == 100:
+            self.status = "Completed"
         super().save(*args, **kwargs)
 
     def __str__(self):

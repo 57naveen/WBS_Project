@@ -78,7 +78,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.getenv("REDIS_URL", "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379")],
+            "hosts": [("127.0.0.1", 6379)],
              
         },
     },
@@ -194,26 +194,17 @@ DATABASES = {
 
 
 
-CELERY_BROKER_URL = "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379"
-CELERY_RESULT_BACKEND = "rediss://default:Ac6CAAIjcDE3N2IzNWNmNjBjY2M0NmI0YjVkY2Q1M2I1NjNjMDc1ZnAxMA@infinite-moose-52866.upstash.io:6379"
+
+# CELERY - Local Redis Server (No SSL)
+CELERY_BROKER_URL = "redis://localhost:6379/0"  # Use redis:// for local without SSL
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-# ✅ Add SSL options for Celery Broker
-CELERY_BROKER_TRANSPORT_OPTIONS = {
-    "visibility_timeout": 3600,  # 1 hour timeout for tasks
-    "ssl": {
-        "ssl_cert_reqs": ssl.CERT_REQUIRED  # Change to "CERT_REQUIRED" for strict SSL
-    }
-}
 
-# ✅ Add SSL options for Celery Results Backend
-CELERY_REDIS_BACKEND_USE_SSL = {
-    "ssl_cert_reqs": ssl.CERT_REQUIRED  # Change to "CERT_REQUIRED" for strict SSL
-}
 
-# Celery Beat Scheduler
+
 CELERY_BEAT_SCHEDULE = {
     "assign_tasks": {
         "task": "wbs.tasks.assign_tasks_to_employees",
